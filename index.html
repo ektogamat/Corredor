@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Corredor POC - Neotix</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link type="text/css" rel="stylesheet" href="main.css">
+	</head>
+
+	<body>
+
+		<div id="container"></div>
+		
+
+		<script type="module">
+
+			import * as THREE from '../build/three.module.js';
+
+			// import Stats from './jsm/libs/stats.module.js';
+		 	// import { GUI } from './jsm/libs/dat.gui.module.js';
+
+			import { OrbitControls } from './jsm/controls/OrbitControls.js';
+			import { GLTFLoader } from './jsm/loaders/GLTFLoader.js';
+			import { RGBELoader } from './jsm/loaders/RGBELoader.js';
+			//import { RoughnessMipmapper } from './jsm/utils/RoughnessMipmapper.js';
+			// import { EffectComposer } from './jsm/postprocessing/EffectComposer.js';
+			// import { RenderPass } from './jsm/postprocessing/RenderPass.js';
+			// import { UnrealBloomPass } from './jsm/postprocessing/UnrealBloomPass.js';
+			import { Reflector } from './jsm/objects/Reflector.js'
+			import { RectAreaLightUniformsLib } from './jsm/lights/RectAreaLightUniformsLib.js';
+			//import { RectAreaLightHelper } from './jsm/helpers/RectAreaLightHelper.js';
+			import { TWEEN } from './jsm/libs/tween.module.min.js'
+
+			let camera, stats , composer, scene, renderer, mouse, raycaster, model;
+
+			let pickableMeshes = [];
+
+			// const params = {
+			// 	exposure: 1.9,
+			// 	bloomStrength: 0.3,
+			// 	bloomThreshold: 0.8,
+			// 	bloomRadius: 5
+
+			// };
+
+			// Raycaster
+			mouse =  new THREE.Vector2()
+			raycaster = new THREE.Raycaster();
+			
+
+			init();
+		
+
+			function init() {
+
+				const container = document.createElement( 'div' );
+				document.body.appendChild( container );
+				RectAreaLightUniformsLib.init();
+
+				// stats = new Stats();
+				// container.appendChild( stats.dom );
+
+				renderer = new THREE.WebGLRenderer( { antialias: false } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				//renderer.toneMapping = THREE.ReinhardToneMapping;
+				
+				renderer.toneMapping = THREE.ACESFilmicToneMapping;
+				//renderer.shadowMapEnabled = false;
+				renderer.toneMappingExposure = 0.8;
+				//renderer.physicallyCorrectLights = true
+				//renderer.outputEncoding = THREE.sRGBEncoding;
+				renderer.gammaOutput = true;
+				container.appendChild( renderer.domElement );
+				
+				
+				scene = new THREE.Scene();
+				camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 0.25, 200 );
+				camera.position.x = -1;
+				camera.position.y = 0;
+				camera.position.z = 0;
+				camera.rotation.y = 1.4;
+				scene.add( camera );
+
+				
+				// Mirror
+				const mirrorBack1 = new Reflector(
+					new THREE.PlaneBufferGeometry(20, 8),
+					{
+						color: new THREE.Color(0x7f7f7f),
+						textureWidth: window.innerWidth * window.devicePixelRatio,
+						textureHeight: window.innerHeight * window.devicePixelRatio
+						
+					}
+				)
+				mirrorBack1.position.y = -2.25;
+				mirrorBack1.position.x = -3;
+				mirrorBack1.rotation.x = -7.85;
+				mirrorBack1.position.z = 0.21;
+				scene.add(mirrorBack1);
+
+				// get the direction of the camera
+				const direction = new THREE.Vector3();
+				camera.getWorldDirection(direction);
+				
+
+				//controls
+				const controls = new OrbitControls( camera, renderer.domElement );
+				controls.maxPolarAngle = Math.PI * 0.5;
+				controls.minDistance = 3;
+				controls.maxDistance = 6;
+				camera.getWorldPosition(controls.target);
+				controls.target.addScaledVector(direction, 1);
+				//controls.target.set(0,0,0);
+				controls.enableDamping = false;
+				
+				controls.update();
+				//camera.updateProjectionMatrix();
+
+
+				// Light
+				const color = 0xFFFFFF;
+				const intensity = 100;
+				const ambient = new THREE.AmbientLight(0x404040, 0.3);
+				scene.add(ambient);
+
+
+				//AreaLight 1
+				const areaLight1 = new THREE.RectAreaLight(0xFFFFFF, 25, 19, 0.2);
+				areaLight1.position.set(-3, 2, 3);
+				areaLight1.rotation.x = THREE.MathUtils.degToRad(-90);
+				scene.add(areaLight1);
+
+				//AreaLight 2
+				const areaLight2 = new THREE.RectAreaLight(0xFFFFFF, 25, 19, 0.2);
+				areaLight2.position.set(-3, 2, -3.5);
+				areaLight2.rotation.x = THREE.MathUtils.degToRad(-90);
+				scene.add(areaLight2);
+				
+				// const helper = new RectAreaLightHelper(areaLight1);
+				// areaLight1.add(helper);
+				
+				// const gui = new GUI();
+				//gui.addColor(new ColorGUIHelper(areaLight1, 'color'), 'value').name('color');
+				
+				// gui.add(areaLight1, 'width', 0, 20);
+				// gui.add(areaLight1, 'height', 0, 20);
+				//gui.add(new DegRadHelper(areaLight1.rotation, 'x'), 'value', -180, 180).name('x rotation');
+				//gui.add(new DegRadHelper(areaLight1.rotation, 'y'), 'value', -180, 180).name('y rotation');
+				//gui.add(new DegRadHelper(areaLight1.rotation, 'z'), 'value', -180, 180).name('z rotation');
+				
+				// makeXYZGUI(gui, mirrorBack1.position, 'position');
+				
+				// function makeXYZGUI(gui, vector3, name, onChangeFn) {
+				// const folder = gui.addFolder(name);
+				// folder.add(vector3, 'x', -10, 10).onChange(onChangeFn);
+				// folder.add(vector3, 'y', 0, 10).onChange(onChangeFn);
+				// folder.add(vector3, 'z', -10, 10).onChange(onChangeFn);
+				// folder.open();
+				// }
+				
+
+				// const renderScene = new RenderPass( scene, camera );
+
+				// const bloomPass = new UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ), 1.5, 0.4, 0.85 );
+				// bloomPass.threshold = params.bloomThreshold;
+				// bloomPass.strength = params.bloomStrength;
+				// bloomPass.radius = params.bloomRadius;
+
+				// composer = new EffectComposer( renderer );
+				// composer.addPass( renderScene );
+				// composer.addPass( bloomPass );
+				//gui.add(bloomPass, 'intensity', 0, 10, 0.01);
+
+				new RGBELoader()
+					.setPath( 'textures/equirectangular/' )
+					.load( 'royal_esplanade_1k.hdr', function ( texture ) {
+
+						texture.mapping = THREE.EquirectangularReflectionMapping;
+
+						scene.background = texture;
+						scene.environment = texture;
+
+						// model
+
+						// use of RoughnessMipmapper is optional
+						//const roughnessMipmapper = new RoughnessMipmapper( renderer );
+
+						const loader = new GLTFLoader().setPath( 'models/gltf/Room/' );
+						loader.load( 'room.glb', function ( gltf ) {
+							
+
+							// gltf.scene.traverse( function ( child ) {
+							// 	if ( child.isMesh ) {
+							// 		roughnessMipmapper.generateMipmaps( child.material );
+							// 	}
+
+							// } );
+							model = gltf.scene;
+							//var newMaterial = new THREE.MeshPhongMaterial( { emissive: 0x111111, envMap: mirrorCamera.renderTarget } );
+							var newMaterial = new THREE.MeshLambertMaterial ({
+								map: texture,    
+								envMap: texture,      
+								combine: THREE.MixOperation,     
+								reflectivity: .9
+							})
+
+							model.traverse((o) => {
+								if (o.isMesh) {
+									pickableMeshes.push(o);
+									console.log(o.name);
+									if (o.name == 'Chao'){
+										o.material.opacity = 0.76;
+									}
+									if (o.name == 'Elevador'){
+										o.material = newMaterial;
+									}
+									if (o.name == 'Portas'){
+										o.material.roughness = 0.18;
+									}
+								}
+							});
+						
+							scene.add( gltf.scene );
+							
+						//	roughnessMipmapper.dispose();
+							
+							animate();
+
+						} );
+
+					} );
+
+
+				// gui.add( params, 'bloomThreshold', 0.0, 1.0 ).onChange( function ( value ) {
+
+				// 	bloomPass.threshold = Number( value );
+
+				// } );
+
+				// gui.add( params, 'bloomStrength', 0.0, 3.0 ).onChange( function ( value ) {
+
+				// 	bloomPass.strength = Number( value );
+
+				// } );
+
+				// gui.add( params, 'bloomRadius', 0.0, 1.0 ).step( 0.01 ).onChange( function ( value ) {
+
+				// 	bloomPass.radius = Number( value );
+
+				// } );
+				
+
+			}
+
+			
+			
+			function onWindowResize() {
+
+				const width = window.innerWidth;
+				const height = window.innerHeight;
+
+				camera.aspect = width / height;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( width, height );
+				//composer.setSize( width, height );
+
+			}
+
+			//
+			function onClick( event ) {
+				mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+				mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+				
+				const intersects = raycaster.intersectObjects( pickableMeshes);
+				console.log(intersects);
+
+				if ( intersects.length > 0 ) {
+					if ( intersects[0].object.name === 'PortaAbre'){
+						//intersects[0].object.material.emissive.setHex( 0xffffff );
+						//intersects[0].object.material.emissiveIntensity = 0.2;
+						animar(intersects[0].object);
+					}
+		
+				}
+			}
+
+			function setupTween (position, target, duration)
+				{
+					//TWEEN.removeAll();    // remove previous tweens if needed
+
+					new TWEEN.Tween (position)
+						.to (target, duration)
+						.easing (TWEEN.Easing.Exponential.InOut)
+						.onUpdate (
+							function() {
+								// copy incoming position into capera position
+								camera.position.copy (position);
+							})
+						.start();
+						
+			}
+
+			function animar (o){
+				//createjs.Tween.get(o.rotation).to({y: 30}),2000;
+				//var from = o.rotation;
+				//var to = 30;
+				var tween = new TWEEN.Tween(o.rotation)
+					.to({y: -1}, 2000)
+					.easing(TWEEN.Easing.Quintic.InOut);
+				//o.rotation.y = 30;
+				tween.start();
+				
+				setupTween (camera.position.clone(), o.position, 1800);
+			}
+
+			function animate() {
+			
+				requestAnimationFrame( animate );
+				// stats.update();
+				TWEEN.update();
+				renderer.render(scene, camera);
+				raycaster.setFromCamera(mouse, camera);
+			
+			}
+
+			window.addEventListener( 'resize', onWindowResize );
+			window.addEventListener ('click', onClick);
+
+		</script>
+		
+	</body>
+</html>
